@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { parseExcel, listExcelSheets, LabelData, SAMPLE_LABEL_DATA } from "@/lib/excel";
 import Label from "@/components/Label";
 
@@ -56,6 +57,7 @@ export default function Home() {
   const [selectedBatchIndex, setSelectedBatchIndex] = useState(0);
   const [printedBatchIndexes, setPrintedBatchIndexes] = useState<number[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [printPortalsReady, setPrintPortalsReady] = useState(false);
 
   useEffect(() => {
     try {
@@ -66,6 +68,10 @@ export default function Home() {
     } catch {
       setJobHistory([]);
     }
+  }, []);
+
+  useEffect(() => {
+    setPrintPortalsReady(true);
   }, []);
 
   const selectedJob = useMemo(
@@ -195,7 +201,7 @@ export default function Home() {
     }
   }
 
-  function handleBatchSizeChange(size: 20 | 10 | 1) {
+  function handleBatchSizeChange(size: (typeof BATCH_OPTIONS)[number]) {
     setBatchSize(size);
     // 그룹 단위가 바뀌면 출력 진행 상태를 초기화한다.
     setSelectedBatchIndex(0);
@@ -214,6 +220,7 @@ export default function Home() {
   }
 
   return (
+    <>
     <main className="min-h-screen bg-gray-100 p-8">
       <div className="mx-auto flex w-full max-w-6xl gap-6">
         <aside className="w-full max-w-[240px] rounded-xl border border-gray-200 bg-white shadow-sm print:hidden">
@@ -345,7 +352,7 @@ export default function Home() {
                     disabled={!selectedBatch || selectedBatch.labels.length === 0}
                     className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                   >
-                    선택그룹 출력
+                    선택 그룹 출력
                   </button>
                   <button
                     type="button"
@@ -549,29 +556,37 @@ export default function Home() {
 
         {loading && <div className="py-10 text-center text-gray-500">파일 읽는 중...</div>}
 
-        <div id="print-test" className="print-buffer">
-          <Label data={SAMPLE_LABEL_DATA} />
-        </div>
-
-        <div id="print-batch" className="print-buffer">
-          <div className="flex flex-col gap-4">
-            {(selectedBatch?.labels ?? []).map(({ data, key }) => (
-              <Label key={`batch-${key}`} data={data} />
-            ))}
-          </div>
-        </div>
-
-        {labels.length > 0 && (
-          <div id="print-area" className="fixed -left-[9999px] top-0">
-            <div className="flex flex-col gap-4">
-              {labels.map(({ data, key }) => (
-                <Label key={key} data={data} />
-              ))}
-            </div>
-          </div>
-        )}
         </div>
       </div>
     </main>
+
+    {printPortalsReady &&
+      createPortal(
+        <>
+          <div id="print-test" className="print-buffer">
+            <Label data={SAMPLE_LABEL_DATA} />
+          </div>
+
+          <div id="print-batch" className="print-buffer">
+            <div id="print-batch-inner" className="flex flex-col gap-4">
+              {(selectedBatch?.labels ?? []).map(({ data, key }) => (
+                <Label key={`batch-${key}`} data={data} />
+              ))}
+            </div>
+          </div>
+
+          {labels.length > 0 ? (
+            <div id="print-area" className="fixed -left-[9999px] top-0">
+              <div id="print-area-inner" className="flex flex-col gap-4">
+                {labels.map(({ data, key }) => (
+                  <Label key={key} data={data} />
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </>,
+        document.body
+      )}
+    </>
   );
 }

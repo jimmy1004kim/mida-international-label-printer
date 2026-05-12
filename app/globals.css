@@ -102,6 +102,23 @@ body {
 @media print {
   body * { visibility: hidden; }
 
+  /* min-h-screen main이 visibility:hidden으로도 높이를 잡아 빈 페이지가 반복되는 것 방지 — 인쇄 루트는 body 직계 포털 */
+  html[data-print-target="test"] body > main,
+  html[data-print-target="batch"] body > main,
+  html[data-print-target="all"] body > main,
+  html[data-print-target="first"] body > main {
+    display: none !important;
+  }
+
+  html[data-print-target="test"] body,
+  html[data-print-target="batch"] body,
+  html[data-print-target="all"] body,
+  html[data-print-target="first"] body {
+    margin: 0;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
   /* data-print-target 은 window.print 직전에만 설정됩니다 */
   html[data-print-target="test"] #print-test,
   html[data-print-target="test"] #print-test * {
@@ -113,6 +130,8 @@ body {
     left: 0;
     opacity: 1;
     z-index: auto;
+    height: 35mm;
+    overflow: hidden;
   }
 
   /* 샘플 1장: 다른 인쇄 루트는 visibility:hidden만으로는 페이지 나눔에 남는 경우가 있어 레이아웃에서 제외 */
@@ -131,12 +150,28 @@ body {
   html[data-print-target="batch"] #print-batch * {
     visibility: visible;
   }
+  /*
+   * 선택 그룹·전체 인쇄는 여러 @page(45×35mm)로 이어져야 한다.
+   * Chromium: position:fixed 인쇄 루트는 자식의 page-break가 무시되거나
+   * 한 뷰포트에 겹쳐 보여 미리보기에 1장만 나오는 경우가 많다 → 문서 흐름(static)으로 둔다.
+   */
   html[data-print-target="batch"] #print-batch {
-    position: fixed;
-    top: 0;
-    left: 0;
-    opacity: 1;
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    opacity: 1 !important;
     z-index: auto;
+    pointer-events: auto !important;
+    /* .print-buffer의 고정 width·화면용 fixed가 페이지 나눔을 막을 수 있음 */
+    width: auto !important;
+    min-width: 45mm;
+    max-width: 100vw;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  html[data-print-target="batch"] #print-batch-inner {
+    display: block !important;
+    overflow: visible !important;
   }
 
   html[data-print-target="batch"] #print-area,
@@ -159,9 +194,18 @@ body {
   }
   html[data-print-target="all"] #print-area,
   html[data-print-target="first"] #print-area {
-    position: fixed;
-    top: 0;
-    left: 0;
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    width: auto !important;
+    min-width: 45mm;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  html[data-print-target="all"] #print-area-inner,
+  html[data-print-target="first"] #print-area-inner {
+    display: block !important;
+    overflow: visible !important;
   }
 
   html[data-print-target="first"] #print-area .label-box ~ .label-box {

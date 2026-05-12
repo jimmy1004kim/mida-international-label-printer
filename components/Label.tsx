@@ -11,21 +11,23 @@ export default function Label({ data }: Props) {
   const barcodeRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
-    if (barcodeRef.current && data.barcode) {
-      try {
-        JsBarcode(barcodeRef.current, data.barcode, {
-          format: "CODE128",
-          width: 0.95,
-          height: 21,
-          displayValue: true,
-          fontSize: 5.5,
-          margin: 0,
-        });
-      } catch {
-        // invalid barcode
-      }
+    const el = barcodeRef.current;
+    if (!el || !data.barcode) return;
+    el.innerHTML = "";
+    try {
+      JsBarcode(el, data.barcode, {
+        format: "CODE128",
+        width: 0.95,
+        height: 21,
+        displayValue: true,
+        fontSize: 5.5,
+        margin: 0,
+      });
+    } catch {
+      // invalid barcode
     }
-  }, [data.barcode]);
+    // 바코드 문자열이 같아도 행(상품명 등)이 다르면 다시 그려야 함
+  }, [data]);
 
   return (
     <div className="label-box">
