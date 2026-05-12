@@ -117,8 +117,10 @@ body {
     display: none !important;
   }
   html[data-print-target="test"] #print-test .label-box {
-    page-break-after: auto;
-    break-after: auto;
+    page-break-after: auto !important;
+    break-after: auto !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   html[data-print-target="batch"] #print-batch,
@@ -169,19 +171,21 @@ body {
     width: 45mm;
     height: 35mm;
     border: none;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 연속 라벨 사이에서만 페이지 나눔 (전역 적용 시 숨겨진/다른 루트 박스까지 나눔이 걸리는 문제 방지) */
+  #print-area .label-box:not(:last-child),
+  #print-batch .label-box:not(:last-child) {
     page-break-after: always;
     break-after: page;
   }
 
-  .label-box:last-child {
-    page-break-after: auto;
-    break-after: auto;
-  }
-
-  /* 첫 장만: 보이는 한 장 뒤 빈 페이지 방지 (:last-child는 마지막 DOM 라벨에만 적용됨) */
+  /* 첫 장만: 한 장만 인쇄 */
   html[data-print-target="first"] #print-area .label-box {
-    page-break-after: auto;
-    break-after: auto;
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 
   .label-product { font-size: 8pt; font-weight: 700; }
