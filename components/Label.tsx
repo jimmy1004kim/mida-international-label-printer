@@ -15,8 +15,8 @@ export default function Label({ data }: Props) {
       try {
         JsBarcode(barcodeRef.current, data.barcode, {
           format: "CODE128",
-          width: 1,
-          height: 22,
+          width: 0.95,
+          height: 21,
           displayValue: true,
           fontSize: 5.5,
           margin: 0,

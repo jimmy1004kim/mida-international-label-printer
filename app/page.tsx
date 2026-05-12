@@ -19,7 +19,14 @@ interface JobRecord {
 const JOBS_STORAGE_KEY = "label-printer-jobs";
 const BATCH_OPTIONS = [20, 10, 1] as const;
 
+/** 연속 클릭·이중 이벤트로 인쇄 대화상자가 두 번 뜨는 것 방지 */
+let lastPrintStartedAt = 0;
+
 function printWithTarget(target: "all" | "first" | "test" | "batch") {
+  const now = Date.now();
+  if (now - lastPrintStartedAt < 900) return;
+  lastPrintStartedAt = now;
+
   const html = document.documentElement;
   html.dataset.printTarget = target;
   const cleanup = () => {
