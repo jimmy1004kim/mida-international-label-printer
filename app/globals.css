@@ -83,6 +83,17 @@ body {
   min-height: 12mm;
 }
 
+/* 화면에서는 보이지 않되 실제 크기로 렌더링 (sr-only 1px 클립은 인쇄 미리보기가 비어 보임) */
+.print-buffer {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 51mm;
+  pointer-events: none;
+  opacity: 0;
+  z-index: -1;
+}
+
 /* ===== 인쇄 설정 ===== */
 @media print {
   body * { visibility: hidden; }
@@ -96,6 +107,18 @@ body {
     position: fixed;
     top: 0;
     left: 0;
+    opacity: 1;
+    z-index: auto;
+  }
+
+  /* 샘플 1장: 다른 인쇄 루트는 visibility:hidden만으로는 페이지 나눔에 남는 경우가 있어 레이아웃에서 제외 */
+  html[data-print-target="test"] #print-area,
+  html[data-print-target="test"] #print-batch {
+    display: none !important;
+  }
+  html[data-print-target="test"] #print-test .label-box {
+    page-break-after: auto;
+    break-after: auto;
   }
 
   html[data-print-target="batch"] #print-batch,
@@ -106,6 +129,20 @@ body {
     position: fixed;
     top: 0;
     left: 0;
+    opacity: 1;
+    z-index: auto;
+  }
+
+  html[data-print-target="batch"] #print-area,
+  html[data-print-target="batch"] #print-test {
+    display: none !important;
+  }
+
+  html[data-print-target="all"] #print-test,
+  html[data-print-target="all"] #print-batch,
+  html[data-print-target="first"] #print-test,
+  html[data-print-target="first"] #print-batch {
+    display: none !important;
   }
 
   html[data-print-target="all"] #print-area,
@@ -134,6 +171,17 @@ body {
     border: none;
     page-break-after: always;
     break-after: page;
+  }
+
+  .label-box:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* 첫 장만: 보이는 한 장 뒤 빈 페이지 방지 (:last-child는 마지막 DOM 라벨에만 적용됨) */
+  html[data-print-target="first"] #print-area .label-box {
+    page-break-after: auto;
+    break-after: auto;
   }
 
   .label-product { font-size: 8pt; font-weight: 700; }

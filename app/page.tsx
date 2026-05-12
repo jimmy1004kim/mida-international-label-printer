@@ -27,7 +27,11 @@ function printWithTarget(target: "all" | "first" | "test" | "batch") {
   };
   window.addEventListener("afterprint", cleanup, { once: true });
   setTimeout(cleanup, 4000);
-  window.print();
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      window.print();
+    });
+  });
 }
 
 export default function Home() {
@@ -538,11 +542,11 @@ export default function Home() {
 
         {loading && <div className="py-10 text-center text-gray-500">파일 읽는 중...</div>}
 
-        <div id="print-test" className="sr-only">
+        <div id="print-test" className="print-buffer">
           <Label data={SAMPLE_LABEL_DATA} />
         </div>
 
-        <div id="print-batch" className="sr-only">
+        <div id="print-batch" className="print-buffer">
           <div className="flex flex-col gap-4">
             {(selectedBatch?.labels ?? []).map(({ data, key }) => (
               <Label key={`batch-${key}`} data={data} />
