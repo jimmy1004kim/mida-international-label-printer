@@ -15,6 +15,7 @@ body {
 .label-box {
   display: flex;
   flex-direction: column;
+  align-items: center;
   width: 170px;   /* 45mm */
   height: 132px;  /* 35mm */
   border: 1px solid #999;
@@ -29,20 +30,22 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: stretch;
   flex: 0 0 28%;
   padding: 0 2px;
 }
 
 .label-barcode svg {
-  width: 80%;
+  width: 87%;
   height: auto;
 }
 
 .label-info {
   flex: 0 0 30%;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   text-align: center;
   padding: 2px 4px 0;
@@ -80,6 +83,7 @@ body {
 
 .label-footer-space {
   flex: 1;
+  align-self: stretch;
   min-height: 12mm;
 }
 
@@ -191,7 +195,7 @@ body {
   .label-product { font-size: 8pt; font-weight: 700; }
   .label-option  { font-size: 7.7pt; font-weight: 700; }
   .label-location { font-size: 9pt; font-weight: 700; }
-  .label-barcode svg { width: 80%; }
+  .label-barcode svg { width: 87%; }
   .label-footer-space { min-height: 12mm; }
 
   @page {
