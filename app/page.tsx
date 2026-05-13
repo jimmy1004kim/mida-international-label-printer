@@ -20,6 +20,17 @@ interface JobRecord {
 }
 
 const JOBS_STORAGE_KEY = "label-printer-jobs";
+/** 작업 이력 보관 기간(용량·할당량 완화) */
+const JOB_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+function pruneJobsByAge(jobs: JobRecord[], nowMs: number = Date.now()): JobRecord[] {
+  const cutoff = nowMs - JOB_RETENTION_MS;
+  return jobs.filter((j) => {
+    const t = new Date(j.createdAt).getTime();
+    return Number.isFinite(t) && t >= cutoff;
+  });
+}
+
 const BATCH_OPTIONS = [50, 20, 10, 1] as const;
 
 function toLocalDateKey(iso: string): string {
@@ -78,8 +89,17 @@ export default function Home() {
     try {
       const raw = window.localStorage.getItem(JOBS_STORAGE_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as JobRecord[];
-      setJobHistory(Array.isArray(parsed) ? parsed : []);
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        setJobHistory([]);
+        return;
+      }
+      const jobs = parsed as JobRecord[];
+      const pruned = pruneJobsByAge(jobs);
+      if (pruned.length !== jobs.length) {
+        window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(pruned));
+      }
+      setJobHistory(pruned);
     } catch {
       setJobHistory([]);
     }
@@ -142,7 +162,7 @@ export default function Home() {
 
   function saveJob(record: JobRecord) {
     setJobHistory((prev) => {
-      const next = [record, ...prev].slice(0, 100);
+      const next = pruneJobsByAge([record, ...prev]).slice(0, 100);
       window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(next));
       return next;
     });
@@ -457,6 +477,7 @@ export default function Home() {
           <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm print:hidden">
             <h2 className="text-lg font-semibold text-gray-800">작업 조회</h2>
             <p className="mt-1 text-sm text-gray-500">이전에 처리한 엑셀 작업 목록과 상세 정보를 확인합니다.</p>
+            <p className="mt-2 text-xs text-gray-400">작업 이력은 최근 7일치만 이 기기에 보관됩니다.</p>
             {jobHistory.length === 0 ? (
               <p className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-500">저장된 작업 이력이 없습니다.</p>
             ) : (
