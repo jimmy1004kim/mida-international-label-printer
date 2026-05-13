@@ -15,10 +15,20 @@ interface JobRecord {
   rowCount: number;
   adjustedQuantityCount: number;
   importHint: string | null;
+  /** 이전 버전 작업에는 없을 수 있음 */
+  labelsSnapshot?: { data: LabelData; key: number }[];
 }
 
 const JOBS_STORAGE_KEY = "label-printer-jobs";
 const BATCH_OPTIONS = [50, 20, 10, 1] as const;
+
+function toLocalDateKey(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 /** 연속 클릭·이중 이벤트로 인쇄 대화상자가 두 번 뜨는 것 방지 */
 let lastPrintStartedAt = 0;
@@ -59,6 +69,9 @@ export default function Home() {
   const [selectedBatchIndex, setSelectedBatchIndex] = useState(0);
   const [printedBatchIndexes, setPrintedBatchIndexes] = useState<number[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isVerifyListOpen, setIsVerifyListOpen] = useState(false);
+  const [verifyListOverride, setVerifyListOverride] = useState<{ data: LabelData; key: number }[] | null>(null);
+  const [jobDateFilter, setJobDateFilter] = useState("");
   const [printPortalsReady, setPrintPortalsReady] = useState(false);
 
   useEffect(() => {
@@ -80,6 +93,19 @@ export default function Home() {
     () => jobHistory.find((job) => job.id === selectedJobId) ?? null,
     [jobHistory, selectedJobId]
   );
+
+  const filteredJobs = useMemo(() => {
+    if (!jobDateFilter) return jobHistory;
+    return jobHistory.filter((job) => toLocalDateKey(job.createdAt) === jobDateFilter);
+  }, [jobHistory, jobDateFilter]);
+
+  useEffect(() => {
+    if (!jobDateFilter || !selectedJobId) return;
+    const sel = jobHistory.find((j) => j.id === selectedJobId);
+    if (!sel || toLocalDateKey(sel.createdAt) !== jobDateFilter) {
+      setSelectedJobId(null);
+    }
+  }, [jobDateFilter, jobHistory, selectedJobId]);
 
   const batchCards = useMemo(() => {
     const cards: Array<{ index: number; start: number; end: number; labels: { data: LabelData; key: number }[] }> =
@@ -107,6 +133,11 @@ export default function Home() {
         .filter((card) => printedBatchIndexes.includes(card.index))
         .reduce((sum, card) => sum + card.labels.length, 0),
     [batchCards, printedBatchIndexes]
+  );
+
+  const verifyDisplayRows = useMemo(
+    () => verifyListOverride ?? labels,
+    [verifyListOverride, labels]
   );
 
   function saveJob(record: JobRecord) {
@@ -149,6 +180,7 @@ export default function Home() {
       totalLabels: expanded.length,
       rowCount: rows.length,
       adjustedQuantityCount,
+      labelsSnapshot: expanded,
       importHint:
         expanded.length === 0
           ? "파일은 읽혔지만 바코드가 있는 데이터 행이 없습니다."
@@ -367,6 +399,16 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => {
+                      setVerifyListOverride(null);
+                      setIsVerifyListOpen(true);
+                    }}
+                    className="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-bold text-gray-700 hover:bg-gray-100"
+                  >
+                    검증하기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       setSelectedBatchIndex(0);
                       setPrintedBatchIndexes([]);
                     }}
@@ -419,23 +461,51 @@ export default function Home() {
               <p className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-500">저장된 작업 이력이 없습니다.</p>
             ) : (
               <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_1fr]">
-                <div className="max-h-[420px] overflow-auto rounded-lg border border-gray-200">
-                  {jobHistory.map((job) => (
+                <div className="flex min-h-0 flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                    <label htmlFor="job-date-filter" className="text-sm font-medium text-gray-700">
+                      날짜 필터
+                    </label>
+                    <input
+                      id="job-date-filter"
+                      type="date"
+                      value={jobDateFilter}
+                      onChange={(e) => setJobDateFilter(e.target.value)}
+                      className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm"
+                    />
                     <button
-                      key={job.id}
                       type="button"
-                      onClick={() => setSelectedJobId(job.id)}
-                      className={`w-full border-b border-gray-100 px-4 py-3 text-left last:border-b-0 ${
-                        selectedJobId === job.id ? "bg-blue-50" : "hover:bg-gray-50"
-                      }`}
+                      onClick={() => setJobDateFilter("")}
+                      className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100"
                     >
-                      <p className="text-sm font-semibold text-gray-800">{job.fileName}</p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        {new Date(job.createdAt).toLocaleString()} · 시트: {job.sheetName} · 라벨:{" "}
-                        {job.totalLabels}장
-                      </p>
+                      전체
                     </button>
-                  ))}
+                    <span className="text-xs text-gray-500">
+                      {jobDateFilter ? `${filteredJobs.length}건` : `전체 ${jobHistory.length}건`}
+                    </span>
+                  </div>
+                  <div className="max-h-[420px] overflow-auto rounded-lg border border-gray-200">
+                    {filteredJobs.length === 0 ? (
+                      <p className="p-4 text-sm text-gray-500">해당 날짜에 저장된 작업이 없습니다.</p>
+                    ) : (
+                      filteredJobs.map((job) => (
+                        <button
+                          key={job.id}
+                          type="button"
+                          onClick={() => setSelectedJobId(job.id)}
+                          className={`w-full border-b border-gray-100 px-4 py-3 text-left last:border-b-0 ${
+                            selectedJobId === job.id ? "bg-blue-50" : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-gray-800">{job.fileName}</p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {new Date(job.createdAt).toLocaleString()} · 시트: {job.sheetName} · 라벨:{" "}
+                            {job.totalLabels}장
+                          </p>
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                   {selectedJob ? (
@@ -473,6 +543,32 @@ export default function Home() {
                           </div>
                         )}
                       </dl>
+                      <div className="mt-4 border-t border-gray-200 pt-4">
+                        <button
+                          type="button"
+                          disabled={
+                            !selectedJob.labelsSnapshot || selectedJob.labelsSnapshot.length === 0
+                          }
+                          title={
+                            !selectedJob.labelsSnapshot?.length
+                              ? "이 작업은 저장 시점에 목록이 없습니다. 동일 파일을 다시 업로드해 주세요."
+                              : undefined
+                          }
+                          onClick={() => {
+                            if (!selectedJob.labelsSnapshot?.length) return;
+                            setVerifyListOverride(selectedJob.labelsSnapshot);
+                            setIsVerifyListOpen(true);
+                          }}
+                          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                        >
+                          출력 목록 검증
+                        </button>
+                        {!selectedJob.labelsSnapshot?.length && (
+                          <p className="mt-2 text-xs text-gray-500">
+                            이 작업은 저장 시점에 목록이 없습니다. 동일 파일을 다시 업로드해 주세요.
+                          </p>
+                        )}
+                      </div>
                     </>
                   ) : (
                     <p className="text-sm text-gray-500">왼쪽 목록에서 작업을 선택하세요.</p>
@@ -551,6 +647,107 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isVerifyListOpen && verifyDisplayRows.length > 0 && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 print:hidden">
+            <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+              <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-5 py-3">
+                <div>
+                  <h3 className="text-base font-bold text-gray-800">출력 목록 검증</h3>
+                  <p className="text-xs text-gray-500">
+                    인쇄 순서와 동일 · 총 {verifyDisplayRows.length}장 (한 행 = 출력 1장)
+                    {verifyListOverride && (
+                      <span className="ml-1 font-medium text-gray-600">· 저장된 작업 기준</span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsVerifyListOpen(false);
+                    setVerifyListOverride(null);
+                  }}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+                >
+                  닫기
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-auto">
+                <table className="w-max min-w-full border-collapse text-left text-sm">
+                  <thead className="sticky top-0 z-10 border-b border-gray-300 bg-gray-200 shadow-sm">
+                    <tr>
+                      {[
+                        ["No", "w-14 text-center"],
+                        ["바코드", "min-w-[120px] max-w-[160px]"],
+                        ["등록상품명", "min-w-[160px] max-w-[240px]"],
+                        ["옵션명", "min-w-[120px] max-w-[200px]"],
+                        ["로케이션", "min-w-[88px] max-w-[120px]"],
+                        ["박스", "min-w-[72px] max-w-[100px]"],
+                        ["날짜", "min-w-[96px] max-w-[120px]"],
+                      ].map(([label, cls]) => (
+                        <th
+                          key={label}
+                          scope="col"
+                          className={`whitespace-nowrap border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 ${cls}`}
+                        >
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {verifyDisplayRows.map(({ data, key }, rowIdx) => (
+                      <tr
+                        key={`verify-row-${key}`}
+                        className={rowIdx % 2 === 0 ? "bg-white" : "bg-gray-50/80"}
+                      >
+                        <td className="border border-gray-200 px-2 py-1.5 text-center tabular-nums text-gray-600">
+                          {rowIdx + 1}
+                        </td>
+                        <td
+                          className="max-w-[160px] truncate border border-gray-200 px-2 py-1.5 font-mono text-xs text-gray-900"
+                          title={data.barcode}
+                        >
+                          {data.barcode}
+                        </td>
+                        <td
+                          className="max-w-[240px] truncate border border-gray-200 px-2 py-1.5 text-gray-900"
+                          title={data.productName}
+                        >
+                          {data.productName}
+                        </td>
+                        <td
+                          className="max-w-[200px] truncate border border-gray-200 px-2 py-1.5 text-gray-800"
+                          title={data.optionName}
+                        >
+                          {data.optionName}
+                        </td>
+                        <td
+                          className="max-w-[120px] truncate border border-gray-200 px-2 py-1.5 text-gray-800"
+                          title={data.location}
+                        >
+                          {data.location}
+                        </td>
+                        <td
+                          className="max-w-[100px] truncate border border-gray-200 px-2 py-1.5 text-gray-700"
+                          title={data.box}
+                        >
+                          {data.box}
+                        </td>
+                        <td
+                          className="max-w-[120px] truncate border border-gray-200 px-2 py-1.5 text-gray-700"
+                          title={data.date}
+                        >
+                          {data.date}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
