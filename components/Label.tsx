@@ -18,10 +18,13 @@ export default function Label({ data }: Props) {
       JsBarcode(el, data.barcode, {
         format: "CODE128",
         width: 0.95,
-        height: 21,
+        height: 27,
         displayValue: true,
-        fontSize: 5.5,
+        fontSize: 6.5,
+        fontOptions: "bold",
         margin: 0,
+        lineColor: "#000000",
+        background: "#ffffff",
       });
     } catch {
       // invalid barcode

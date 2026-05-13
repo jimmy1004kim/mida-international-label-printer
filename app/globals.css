@@ -40,6 +40,7 @@ body {
 .label-barcode svg {
   width: 83%;
   height: auto;
+  margin-left: 3px;
 }
 
 .label-info {
@@ -241,7 +242,12 @@ body {
   .label-product { font-size: 8pt; font-weight: 700; }
   .label-option  { font-size: 7.7pt; font-weight: 700; }
   .label-location { font-size: 9pt; font-weight: 700; }
-  .label-barcode svg { width: 83%; }
+  .label-barcode svg {
+    width: 83%;
+    margin-left: 3px;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
   .label-footer-space { min-height: 10.5mm; }
 
   @page {
