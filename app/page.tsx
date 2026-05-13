@@ -6,6 +6,12 @@ import Label from "@/components/Label";
 
 type NavTab = "print" | "jobs" | "test";
 
+type LabelDataWithSpan = LabelData & {
+  rowIndex: number;
+  startLabel: number;
+  endLabel: number;
+};
+
 interface JobRecord {
   id: string;
   createdAt: string;
@@ -72,6 +78,7 @@ export default function Home() {
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [rows, setRows] = useState<LabelDataWithSpan[]>([]);
   const [jobHistory, setJobHistory] = useState<JobRecord[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [batchSize, setBatchSize] = useState<(typeof BATCH_OPTIONS)[number]>(20);
@@ -125,32 +132,46 @@ export default function Home() {
     }
   }, [jobDateFilter, jobHistory, selectedJobId]);
 
-  const batchCards = useMemo(() => {
-    const cards: Array<{ index: number; start: number; end: number; labels: { data: LabelData; key: number }[] }> =
-      [];
-    for (let start = 0, idx = 0; start < labels.length; start += batchSize, idx += 1) {
-      const labelsInCard = labels.slice(start, start + batchSize);
+  const rowBatchCards = useMemo(() => {
+    const cards: Array<{
+      index: number;
+      rowStart: number;
+      rowEnd: number;
+      rows: LabelDataWithSpan[];
+      startLabel: number;
+      endLabel: number;
+      totalLabels: number;
+    }> = [];
+    for (let start = 0, idx = 0; start < rows.length; start += batchSize, idx += 1) {
+      const rowsInCard = rows.slice(start, start + batchSize);
+      if (rowsInCard.length === 0) continue;
+      const startLabel = rowsInCard[0].startLabel;
+      const endLabel = rowsInCard[rowsInCard.length - 1].endLabel;
+      const totalLabels = rowsInCard.reduce((sum, r) => sum + r.quantity, 0);
       cards.push({
         index: idx,
-        start: start + 1,
-        end: start + labelsInCard.length,
-        labels: labelsInCard,
+        rowStart: start + 1,
+        rowEnd: start + rowsInCard.length,
+        rows: rowsInCard,
+        startLabel,
+        endLabel,
+        totalLabels,
       });
     }
     return cards;
-  }, [labels, batchSize]);
+  }, [rows, batchSize]);
 
   const selectedBatch = useMemo(
-    () => batchCards.find((card) => card.index === selectedBatchIndex) ?? null,
-    [batchCards, selectedBatchIndex]
+    () => rowBatchCards.find((card) => card.index === selectedBatchIndex) ?? null,
+    [rowBatchCards, selectedBatchIndex]
   );
 
   const printedLabelCount = useMemo(
     () =>
-      batchCards
+      rowBatchCards
         .filter((card) => printedBatchIndexes.includes(card.index))
-        .reduce((sum, card) => sum + card.labels.length, 0),
-    [batchCards, printedBatchIndexes]
+        .reduce((sum, card) => sum + card.totalLabels, 0),
+    [rowBatchCards, printedBatchIndexes]
   );
 
   const verifyDisplayRows = useMemo(
@@ -168,16 +189,24 @@ export default function Home() {
   }
 
   async function parseAndExpand(file: File, sheetName: string) {
-    const rows = await parseExcel(file, { sheetName });
-    const adjustedQuantityCount = rows.filter((row) => row.quantityAdjusted).length;
+    const parsedRows = await parseExcel(file, { sheetName });
+    const adjustedQuantityCount = parsedRows.filter((row) => row.quantityAdjusted).length;
     const expanded: { data: LabelData; key: number }[] = [];
+    const rowsWithSpan: LabelDataWithSpan[] = [];
     let key = 0;
-    for (const row of rows) {
-      for (let i = 0; i < row.quantity; i++) {
+    let cursor = 0;
+    parsedRows.forEach((row, rowIndex) => {
+      const start = cursor;
+      const quantity = row.quantity ?? 1;
+      for (let i = 0; i < quantity; i += 1) {
         expanded.push({ data: row, key: key++ });
+        cursor += 1;
       }
-    }
+      const end = cursor;
+      rowsWithSpan.push({ ...row, rowIndex, startLabel: start, endLabel: end });
+    });
     setLabels(expanded);
+    setRows(rowsWithSpan);
 
     let hint: string | null = null;
     if (expanded.length === 0) {
@@ -196,7 +225,7 @@ export default function Home() {
       fileName: file.name,
       sheetName,
       totalLabels: expanded.length,
-      rowCount: rows.length,
+      rowCount: parsedRows.length,
       adjustedQuantityCount,
       labelsSnapshot: expanded,
       importHint:
@@ -261,13 +290,13 @@ export default function Home() {
   }
 
   function handlePrintBatch() {
-    if (!selectedBatch || selectedBatch.labels.length === 0) return;
+    if (!selectedBatch || selectedBatch.totalLabels === 0) return;
     printWithTarget("batch");
     setPrintedBatchIndexes((prev) => (prev.includes(selectedBatch.index) ? prev : [...prev, selectedBatch.index]));
   }
 
   function handleOpenBatchPreview() {
-    if (!selectedBatch || selectedBatch.labels.length === 0) return;
+    if (!selectedBatch || selectedBatch.totalLabels === 0) return;
     setIsPreviewOpen(true);
   }
 
@@ -375,7 +404,10 @@ export default function Home() {
                     </span>
                   </div>
                   <span className="text-sm text-gray-500">
-                    선택 그룹: {selectedBatch ? `${selectedBatch.start}~${selectedBatch.end} (${selectedBatch.labels.length}장)` : "-"}
+                    선택 그룹:{" "}
+                    {selectedBatch
+                      ? `${selectedBatch.rowStart}~${selectedBatch.rowEnd}행 (${selectedBatch.totalLabels}장)`
+                      : "-"}
                   </span>
                 </div>
 
@@ -401,7 +433,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={handlePrintBatch}
-                    disabled={!selectedBatch || selectedBatch.labels.length === 0}
+                    disabled={!selectedBatch || selectedBatch.totalLabels === 0}
                     className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                   >
                     선택 그룹 출력
@@ -409,7 +441,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={handleOpenBatchPreview}
-                    disabled={!selectedBatch || selectedBatch.labels.length === 0}
+                    disabled={!selectedBatch || selectedBatch.totalLabels === 0}
                     className="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-bold text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
                   >
                     선택 그룹 보기
@@ -437,7 +469,7 @@ export default function Home() {
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {batchCards.map((card) => {
+                  {rowBatchCards.map((card) => {
                     const printed = printedBatchIndexes.includes(card.index);
                     const selected = selectedBatchIndex === card.index;
                     return (
@@ -455,12 +487,12 @@ export default function Home() {
                       >
                         <p className="text-xs font-semibold">그룹 {card.index + 1}</p>
                         <p className="mt-1 text-sm font-bold">
-                          {card.start}~{card.end}번 ({card.labels.length}장)
+                          {card.rowStart}~{card.rowEnd}행 ({card.totalLabels}장)
                         </p>
                         <p className="mt-2 truncate text-xs">
-                          {card.labels[0]?.data.productName ?? "-"}
+                          {card.rows[0]?.productName ?? "-"}
                         </p>
-                        <p className="truncate text-xs">{card.labels[0]?.data.optionName ?? "-"}</p>
+                        <p className="truncate text-xs">{card.rows[0]?.optionName ?? "-"}</p>
                         {printed && <p className="mt-2 text-[11px] font-semibold">출력 완료</p>}
                       </button>
                     );
@@ -633,7 +665,7 @@ export default function Home() {
                 <div>
                   <h3 className="text-base font-bold text-gray-800">선택 그룹 보기</h3>
                   <p className="text-xs text-gray-500">
-                    그룹 {selectedBatch.index + 1} · {selectedBatch.start}~{selectedBatch.end}번 · {selectedBatch.labels.length}장
+                    그룹 {selectedBatch.index + 1} · {selectedBatch.rowStart}~{selectedBatch.rowEnd}행 · {selectedBatch.totalLabels}장
                   </p>
                 </div>
                 <button
@@ -646,24 +678,31 @@ export default function Home() {
               </div>
               <div className="grid max-h-[80vh] gap-0 overflow-auto md:grid-cols-[1fr_1fr]">
                 <div className="border-r border-gray-200">
-                  {selectedBatch.labels.map(({ data, key }, idx) => (
-                    <div key={`preview-item-${key}`} className="border-b border-gray-100 px-4 py-2">
+                  {labels
+                    .slice(selectedBatch.startLabel, selectedBatch.endLabel)
+                    .map(({ data, key }, idx) => (
+                      <div key={`preview-item-${key}`} className="border-b border-gray-100 px-4 py-2">
                       <p className="text-xs font-semibold text-gray-500">
-                        {selectedBatch.start + idx}번
+                        {selectedBatch.rowStart + idx}행
                       </p>
                       <p className="truncate text-sm font-semibold text-gray-800">{data.productName}</p>
                       <p className="truncate text-xs text-gray-600">{data.optionName}</p>
                       <p className="truncate text-xs text-gray-500">{data.location}</p>
-                    </div>
-                  ))}
+                      </div>
+                    ))}
                 </div>
                 <div className="bg-gray-50 p-4">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {selectedBatch.labels.map(({ data, key }) => (
-                      <div key={`preview-label-${key}`} className="rounded border border-dashed border-gray-300 bg-white p-2">
-                        <Label data={data} />
-                      </div>
-                    ))}
+                    {labels
+                      .slice(selectedBatch.startLabel, selectedBatch.endLabel)
+                      .map(({ data, key }) => (
+                        <div
+                          key={`preview-label-${key}`}
+                          className="rounded border border-dashed border-gray-300 bg-white p-2"
+                        >
+                          <Label data={data} />
+                        </div>
+                      ))}
                   </div>
                 </div>
               </div>
@@ -787,9 +826,10 @@ export default function Home() {
 
           <div id="print-batch" className="print-buffer">
             <div id="print-batch-inner" className="flex flex-col gap-4">
-              {(selectedBatch?.labels ?? []).map(({ data, key }) => (
-                <Label key={`batch-${key}`} data={data} />
-              ))}
+              {selectedBatch &&
+                labels
+                  .slice(selectedBatch.startLabel, selectedBatch.endLabel)
+                  .map(({ data, key }) => <Label key={`batch-${key}`} data={data} />)}
             </div>
           </div>
 
