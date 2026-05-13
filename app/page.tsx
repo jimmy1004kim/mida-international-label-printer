@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { parseExcel, listExcelSheets, LabelData, SAMPLE_LABEL_DATA } from "@/lib/excel";
+import { parseExcel, listExcelSheets, LabelData, SAMPLE_LABEL_DATA, BLANK_LABEL_DATA } from "@/lib/excel";
 import Label from "@/components/Label";
 
 type NavTab = "print" | "jobs" | "test";
@@ -37,7 +37,7 @@ function pruneJobsByAge(jobs: JobRecord[], nowMs: number = Date.now()): JobRecor
   });
 }
 
-const BATCH_OPTIONS = [50, 20, 10, 1] as const;
+const BATCH_OPTIONS = [53, 20, 10, 1] as const;
 
 function toLocalDateKey(iso: string): string {
   const d = new Date(iso);
@@ -81,7 +81,7 @@ export default function Home() {
   const [rows, setRows] = useState<LabelDataWithSpan[]>([]);
   const [jobHistory, setJobHistory] = useState<JobRecord[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [batchSize, setBatchSize] = useState<(typeof BATCH_OPTIONS)[number]>(20);
+  const [batchSize, setBatchSize] = useState<(typeof BATCH_OPTIONS)[number]>(53);
   const [selectedBatchIndex, setSelectedBatchIndex] = useState(0);
   const [printedBatchIndexes, setPrintedBatchIndexes] = useState<number[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -665,7 +665,9 @@ export default function Home() {
                 <div>
                   <h3 className="text-base font-bold text-gray-800">선택 그룹 보기</h3>
                   <p className="text-xs text-gray-500">
-                    그룹 {selectedBatch.index + 1} · {selectedBatch.rowStart}~{selectedBatch.rowEnd}행 · {selectedBatch.totalLabels}장
+                    그룹 {selectedBatch.index + 1} · {selectedBatch.rowStart}~{selectedBatch.rowEnd}행 ·{" "}
+                    {selectedBatch.totalLabels + (batchSize === 53 ? 1 : 0)}장
+                    {batchSize === 53 ? " (빈 라벨 1장 포함)" : ""}
                   </p>
                 </div>
                 <button
@@ -703,6 +705,14 @@ export default function Home() {
                           <Label data={data} />
                         </div>
                       ))}
+                    {batchSize === 53 && (
+                      <div
+                        key="preview-label-blank-trailer"
+                        className="rounded border border-dashed border-gray-300 bg-white p-2"
+                      >
+                        <Label data={BLANK_LABEL_DATA} />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -826,10 +836,18 @@ export default function Home() {
 
           <div id="print-batch" className="print-buffer">
             <div id="print-batch-inner" className="flex flex-col gap-4">
-              {selectedBatch &&
-                labels
-                  .slice(selectedBatch.startLabel, selectedBatch.endLabel)
-                  .map(({ data, key }) => <Label key={`batch-${key}`} data={data} />)}
+              {selectedBatch && (
+                <>
+                  {labels
+                    .slice(selectedBatch.startLabel, selectedBatch.endLabel)
+                    .map(({ data, key }) => (
+                      <Label key={`batch-${key}`} data={data} />
+                    ))}
+                  {batchSize === 53 && (
+                    <Label key="batch-blank-trailer" data={BLANK_LABEL_DATA} />
+                  )}
+                </>
+              )}
             </div>
           </div>
 

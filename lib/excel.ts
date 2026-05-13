@@ -22,6 +22,17 @@ export const SAMPLE_LABEL_DATA: LabelData = {
   quantity: 1,
 };
 
+/** 출력 단위 53 등에서 맨 끝에 붙이는 빈 라벨(바코드 없음) */
+export const BLANK_LABEL_DATA: LabelData = {
+  box: "",
+  date: "",
+  location: "",
+  productName: "",
+  optionName: "",
+  barcode: "",
+  quantity: 1,
+};
+
 function cellString(v: unknown): string {
   if (v == null || v === "") return "";
   if (typeof v === "number" && Number.isFinite(v)) return String(v);
