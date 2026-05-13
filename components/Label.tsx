@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
 import { LabelData } from "@/lib/excel";
 
@@ -7,26 +7,37 @@ interface Props {
   data: LabelData;
 }
 
+/** 긴 CODE128은 모듈 width를 줄여 라벨 너비 안에 들어가게 함 (최소는 스캔 가능 수준으로 유지) */
+function barcodeModuleWidth(barcodeLength: number): number {
+  const maxW = 0.95;
+  const minW = 0.52;
+  if (barcodeLength <= 10) return maxW;
+  if (barcodeLength >= 30) return minW;
+  return maxW - ((barcodeLength - 10) / 20) * (maxW - minW);
+}
+
 export default function Label({ data }: Props) {
   const barcodeRef = useRef<SVGSVGElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = barcodeRef.current;
     if (!el || !data.barcode) return;
     el.innerHTML = "";
     try {
+      const len = data.barcode.length;
       JsBarcode(el, data.barcode, {
         format: "CODE128",
-        width: 0.95,
+        width: barcodeModuleWidth(len),
         height: 21,
         displayValue: true,
         fontSize: 5.5,
         margin: 0,
+        lineColor: "#000000",
+        background: "#ffffff",
       });
     } catch {
       // invalid barcode
     }
-    // 바코드 문자열이 같아도 행(상품명 등)이 다르면 다시 그려야 함
   }, [data]);
 
   return (

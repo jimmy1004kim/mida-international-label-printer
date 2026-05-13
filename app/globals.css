@@ -223,6 +223,14 @@ body {
     page-break-inside: avoid;
     padding-left: 0.35mm;
     padding-right: 0.1mm;
+    /* 화면용 overflow:hidden 상속 시 바코드·텍스트가 간헐적으로 클리핑됨 */
+    overflow: visible !important;
+  }
+
+  .label-barcode {
+    overflow: visible !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
   /* 연속 라벨 사이에서만 페이지 나눔 (전역 적용 시 숨겨진/다른 루트 박스까지 나눔이 걸리는 문제 방지) */
@@ -241,7 +249,14 @@ body {
   .label-product { font-size: 8pt; font-weight: 700; }
   .label-option  { font-size: 7.7pt; font-weight: 700; }
   .label-location { font-size: 9pt; font-weight: 700; }
-  .label-barcode svg { width: 83%; }
+  .label-barcode svg {
+    max-width: 100%;
+    width: 96%;
+    height: auto;
+    shape-rendering: crispEdges;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
   .label-footer-space { min-height: 10.5mm; }
 
   @page {
