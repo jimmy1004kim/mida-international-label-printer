@@ -43,6 +43,16 @@ body {
   margin-left: 3px;
 }
 
+/* JsBarcode 하단 숫자 — 막대는 rect, 글자만 text */
+.label-barcode svg text {
+  fill: #0a0a0a !important;
+  font-weight: 900 !important;
+  stroke: #0a0a0a;
+  stroke-width: 0.12;
+  paint-order: stroke fill;
+  text-rendering: geometricPrecision;
+}
+
 .label-info {
   flex: 0 0 30%;
   display: flex;
@@ -54,10 +64,13 @@ body {
   gap: 1px;
 }
 
+/* 배치(글자 크기) 유지, 획만 굵게 — 인쇄 선명도 */
 .label-product {
   font-size: 9px;
-  font-weight: 700;
+  font-weight: 900;
   line-height: 1.1;
+  color: #0a0a0a;
+  -webkit-text-stroke: 0.15px #0a0a0a;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -66,8 +79,10 @@ body {
 
 .label-option {
   font-size: 8.5px;
-  font-weight: 700;
+  font-weight: 900;
   line-height: 1.1;
+  color: #0a0a0a;
+  -webkit-text-stroke: 0.15px #0a0a0a;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -77,9 +92,10 @@ body {
 .label-location {
   margin-top: 0;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 900;
   line-height: 1;
-  color: #111;
+  color: #0a0a0a;
+  -webkit-text-stroke: 0.15px #0a0a0a;
   letter-spacing: 0;
 }
 
@@ -239,12 +255,42 @@ body {
     break-after: auto !important;
   }
 
-  .label-product { font-size: 8pt; font-weight: 700; }
-  .label-option  { font-size: 7.7pt; font-weight: 700; }
-  .label-location { font-size: 9pt; font-weight: 700; }
+  .label-product {
+    font-size: 8pt;
+    font-weight: 900;
+    color: #0a0a0a;
+    -webkit-text-stroke: 0.2pt #0a0a0a;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .label-option {
+    font-size: 7.7pt;
+    font-weight: 900;
+    color: #0a0a0a;
+    -webkit-text-stroke: 0.2pt #0a0a0a;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .label-location {
+    font-size: 9pt;
+    font-weight: 900;
+    color: #0a0a0a;
+    -webkit-text-stroke: 0.2pt #0a0a0a;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
   .label-barcode svg {
     width: 83%;
     margin-left: 3px;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .label-barcode svg text {
+    fill: #0a0a0a !important;
+    font-weight: 900 !important;
+    stroke: #0a0a0a;
+    stroke-width: 0.15;
+    paint-order: stroke fill;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
