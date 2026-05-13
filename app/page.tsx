@@ -18,7 +18,7 @@ interface JobRecord {
 }
 
 const JOBS_STORAGE_KEY = "label-printer-jobs";
-const BATCH_OPTIONS = [20, 10, 1] as const;
+const BATCH_OPTIONS = [50, 20, 10, 1] as const;
 
 /** 연속 클릭·이중 이벤트로 인쇄 대화상자가 두 번 뜨는 것 방지 */
 let lastPrintStartedAt = 0;
