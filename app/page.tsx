@@ -58,9 +58,7 @@ function printWithTarget(target: "all" | "first" | "test" | "batch") {
   setTimeout(cleanup, 4000);
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      setTimeout(() => {
-        window.print();
-      }, 0);
+      window.print();
     });
   });
 }
