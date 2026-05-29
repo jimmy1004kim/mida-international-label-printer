@@ -38,6 +38,14 @@ function pruneJobsByAge(jobs: JobRecord[], nowMs: number = Date.now()): JobRecor
 }
 
 const BATCH_OPTIONS = [53, 20, 10, 1] as const;
+const MAX_BATCH_SIZE_WITHOUT_ROWS = 999;
+
+function clampBatchSize(size: number, rowCount: number): number {
+  const floored = Math.floor(size);
+  const min = Math.max(1, floored);
+  const max = rowCount > 0 ? rowCount : MAX_BATCH_SIZE_WITHOUT_ROWS;
+  return Math.min(min, max);
+}
 
 function toLocalDateKey(iso: string): string {
   const d = new Date(iso);
@@ -81,7 +89,9 @@ export default function Home() {
   const [rows, setRows] = useState<LabelDataWithSpan[]>([]);
   const [jobHistory, setJobHistory] = useState<JobRecord[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [batchSize, setBatchSize] = useState<(typeof BATCH_OPTIONS)[number]>(53);
+  const [batchSize, setBatchSize] = useState<number>(53);
+  const [batchSizeDraft, setBatchSizeDraft] = useState("53");
+  const [batchSizeHint, setBatchSizeHint] = useState<string | null>(null);
   const [selectedBatchIndex, setSelectedBatchIndex] = useState(0);
   const [printedBatchIndexes, setPrintedBatchIndexes] = useState<number[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -216,6 +226,13 @@ export default function Home() {
       hint = `일부 행의 수량 값이 비정상적으로 보여 ${adjustedQuantityCount}개 행을 자동 보정했습니다. 수량 컬럼(수량/개수/Qty) 값을 확인해 주세요.`;
     }
     setImportHint(hint);
+    setBatchSizeHint(null);
+    let nextBatch = 53;
+    setBatchSize((prev) => {
+      nextBatch = clampBatchSize(prev, rowsWithSpan.length);
+      return nextBatch;
+    });
+    setBatchSizeDraft(String(nextBatch));
     setSelectedBatchIndex(0);
     setPrintedBatchIndexes([]);
 
@@ -282,12 +299,42 @@ export default function Home() {
     }
   }
 
-  function handleBatchSizeChange(size: (typeof BATCH_OPTIONS)[number]) {
-    setBatchSize(size);
-    // 그룹 단위가 바뀌면 출력 진행 상태를 초기화한다.
+  function resetBatchProgress() {
     setSelectedBatchIndex(0);
     setPrintedBatchIndexes([]);
   }
+
+  /** 프리셋 버튼 — 입력값만 변경 (적용 전) */
+  function pickPresetBatchSize(size: number) {
+    setBatchSizeDraft(String(size));
+    setBatchSizeHint(null);
+  }
+
+  /** 적용 — 프리셋·직접 입력 공통 */
+  function applyBatchSize() {
+    const raw = batchSizeDraft.trim();
+    if (!raw) {
+      setBatchSizeHint("1 이상의 숫자를 입력해 주세요.");
+      return;
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setBatchSizeHint("1 이상의 숫자를 입력해 주세요.");
+      return;
+    }
+    const clamped = clampBatchSize(parsed, rows.length);
+    setBatchSize(clamped);
+    setBatchSizeDraft(String(clamped));
+    setBatchSizeHint(null);
+    resetBatchProgress();
+  }
+
+  const draftBatchNumber = Number(batchSizeDraft.trim());
+  const hasPendingBatchSize =
+    batchSizeDraft.trim() !== "" &&
+    Number.isFinite(draftBatchNumber) &&
+    draftBatchNumber >= 1 &&
+    clampBatchSize(draftBatchNumber, rows.length) !== batchSize;
 
   function handlePrintBatch() {
     if (!selectedBatch || selectedBatch.totalLabels === 0) return;
@@ -411,22 +458,68 @@ export default function Home() {
                   </span>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <span className="mr-1 text-sm font-medium text-gray-700">출력 단위</span>
-                  {BATCH_OPTIONS.map((size) => (
+                <div className="mt-4 flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                    <span className="font-medium text-gray-700">출력 단위</span>
+                    <span>
+                      적용됨: <strong className="text-gray-800">{batchSize}행씩</strong> · {rowBatchCards.length}그룹
+                    </span>
+                    {hasPendingBatchSize && (
+                      <span className="text-amber-700">→ 적용 대기: {batchSizeDraft}행씩</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {BATCH_OPTIONS.map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => pickPresetBatchSize(size)}
+                        className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
+                          batchSizeDraft === String(size)
+                            ? "bg-blue-600 text-white"
+                            : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+                        }`}
+                      >
+                        {size}개
+                      </button>
+                    ))}
+                    <span className="mx-1 text-sm text-gray-400">|</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={rows.length > 0 ? rows.length : MAX_BATCH_SIZE_WITHOUT_ROWS}
+                      inputMode="numeric"
+                      value={batchSizeDraft}
+                      onChange={(e) => {
+                        setBatchSizeDraft(e.target.value);
+                        setBatchSizeHint(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          applyBatchSize();
+                        }
+                      }}
+                      placeholder={rows.length > 0 ? `1~${rows.length}` : "행 수"}
+                      aria-label="출력 단위 행 수"
+                      className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                    />
+                    <span className="text-sm text-gray-600">행씩</span>
                     <button
-                      key={size}
                       type="button"
-                      onClick={() => handleBatchSizeChange(size)}
-                      className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
-                        batchSize === size
-                          ? "bg-blue-600 text-white"
+                      onClick={applyBatchSize}
+                      className={`rounded-md px-4 py-1.5 text-sm font-bold ${
+                        hasPendingBatchSize
+                          ? "bg-blue-600 text-white hover:bg-blue-700"
                           : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
                       }`}
                     >
-                      {size}개
+                      적용
                     </button>
-                  ))}
+                    {batchSizeHint && (
+                      <span className="text-sm text-amber-700">{batchSizeHint}</span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
