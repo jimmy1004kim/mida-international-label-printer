@@ -200,6 +200,7 @@ export default function Home() {
 
   async function parseAndExpand(file: File, sheetName: string) {
     const parsedRows = await parseExcel(file, { sheetName });
+    const zeroQuantityCount = parsedRows.filter((row) => row.quantity === 0).length;
     const adjustedQuantityCount = parsedRows.filter((row) => row.quantityAdjusted).length;
     const expanded: { data: LabelData; key: number }[] = [];
     const rowsWithSpan: LabelDataWithSpan[] = [];
@@ -207,7 +208,7 @@ export default function Home() {
     let cursor = 0;
     parsedRows.forEach((row, rowIndex) => {
       const start = cursor;
-      const quantity = row.quantity ?? 1;
+      const quantity = row.quantity > 0 ? row.quantity : 0;
       for (let i = 0; i < quantity; i += 1) {
         expanded.push({ data: row, key: key++ });
         cursor += 1;
@@ -219,11 +220,22 @@ export default function Home() {
     setRows(rowsWithSpan);
 
     let hint: string | null = null;
-    if (expanded.length === 0) {
+    if (parsedRows.length === 0) {
       hint =
         "파일은 읽혔지만 바코드가 있는 데이터 행이 없습니다. 첫 줄에 열 이름(바코드, 수량, 등록상품명 등)이 오도록 하거나, 시트 선택이 올바른지 확인해 주세요.";
-    } else if (adjustedQuantityCount > 0) {
-      hint = `일부 행의 수량 값이 비정상적으로 보여 ${adjustedQuantityCount}개 행을 자동 보정했습니다. 수량 컬럼(수량/개수/Qty) 값을 확인해 주세요.`;
+    } else if (expanded.length === 0 && zeroQuantityCount > 0) {
+      hint = `수량 0인 ${zeroQuantityCount}개 행은 목록에 포함되며 라벨은 출력하지 않습니다.`;
+    } else {
+      const parts: string[] = [];
+      if (zeroQuantityCount > 0) {
+        parts.push(`수량 0인 ${zeroQuantityCount}개 행은 라벨 없음(수량 0).`);
+      }
+      if (adjustedQuantityCount > 0) {
+        parts.push(
+          `일부 행의 수량 값이 비정상적으로 보여 ${adjustedQuantityCount}개 행을 자동 보정했습니다. 수량 컬럼(수량/개수/Qty) 값을 확인해 주세요.`
+        );
+      }
+      if (parts.length > 0) hint = parts.join(" ");
     }
     setImportHint(hint);
     setBatchSizeHint(null);
@@ -440,11 +452,18 @@ export default function Home() {
               </div>
             )}
 
-            {labels.length > 0 && (
+            {rows.length > 0 && (
               <div className="mb-6 rounded-xl bg-white p-4 shadow-sm print:hidden">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <span className="font-medium text-gray-700">총 라벨 수: </span>
+                    <span className="font-medium text-gray-700">데이터 </span>
+                    <span className="text-lg font-bold text-gray-800">{rows.length}행</span>
+                    {rows.some((r) => r.quantity === 0) && (
+                      <span className="ml-2 text-sm text-amber-700">
+                        (수량 0: {rows.filter((r) => r.quantity === 0).length}행)
+                      </span>
+                    )}
+                    <span className="ml-3 font-medium text-gray-700">라벨 </span>
                     <span className="text-lg font-bold text-blue-600">{labels.length}장</span>
                     <span className="ml-3 text-sm text-gray-500">
                       출력됨: {printedLabelCount}장 / 남음: {Math.max(labels.length - printedLabelCount, 0)}장
@@ -580,8 +599,13 @@ export default function Home() {
                       >
                         <p className="text-xs font-semibold">그룹 {card.index + 1}</p>
                         <p className="mt-1 text-sm font-bold">
-                          {card.rowStart}~{card.rowEnd}행 ({card.totalLabels}장)
+                          {card.rowStart}~{card.rowEnd}행 · 라벨 {card.totalLabels}장
                         </p>
+                        {card.rows.some((r) => r.quantity === 0) && (
+                          <p className="mt-1 text-[11px] text-amber-700">
+                            수량 0: {card.rows.filter((r) => r.quantity === 0).length}행
+                          </p>
+                        )}
                         <p className="mt-2 truncate text-xs">
                           {card.rows[0]?.productName ?? "-"}
                         </p>

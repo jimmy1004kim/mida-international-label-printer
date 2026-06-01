@@ -117,9 +117,11 @@ function pickQuantityRaw(row: Record<string, unknown>): string {
 
 function sanitizeQuantity(raw: string): { quantity: number; adjusted: boolean } {
   const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return { quantity: 1, adjusted: raw !== "" };
+  if (n === 0) return { quantity: 0, adjusted: false };
+  if (!Number.isFinite(n) || n < 0) return { quantity: 1, adjusted: raw !== "" };
 
   const whole = Math.floor(n);
+  if (whole === 0) return { quantity: 0, adjusted: whole !== n };
   // 날짜 직렬 값이 수량으로 잘못 매핑되는 경우 보호.
   if (whole >= 40000 && whole <= 60000) {
     return { quantity: 1, adjusted: true };
